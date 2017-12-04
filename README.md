@@ -122,10 +122,8 @@ timezone and do things like:
  appropriately on loading:
  
 ```python
->>>  print(backend.load('test', allow_load=True).frame)
-            estimate
-2017-07-01      0.17
-2017-10-01       NaN
+>>>  print(backend.load('test', allow_load=True).frame.index)
+2017-07-01 00:00:00-04:00
 ```
 
 ## Key Features
