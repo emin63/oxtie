@@ -121,7 +121,7 @@ timezone and do things like:
  class looks for the `'timezone'` in the attributes and localize
  appropriately on loading:
  
-```python
+```
 >>>  print(backend.load('test', allow_load=True).frame.index[0])
 2017-07-01 00:00:00-04:00
 ```
