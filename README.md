@@ -48,9 +48,9 @@ You could instead have done something
 like `from oxtie.backs import aws` to get a different backend and
 use `backend = aws.S3Backend('prefix', 'bucket')` to save to Amazon
 S3. Or if you prefer DynamoDB, you could
-use `backend = aws.DynamoBackend(table_name, key_name=my_key_name)` to
+use `backend = aws.DynamoBackend(table_name, key_name)` to
 have you data saved to the table `table_name` with primary key
-`my_key_name` instead. The key idea is that `oxtie` handles dealing
+`key_name` instead. The key idea is that `oxtie` handles dealing
 with the different backends so you don't have to worry about it or
 change your code (apart from choosing the backend of course).
 
@@ -62,12 +62,71 @@ following (possibly in another python session):
 'SimpleFrame'
 >>> g.frame.to_csv() == f.frame.to_csv()  # Compare CSVs to handle Nones
 True
+>>> g.arbitrary == f.arbitrary  # Aribitrary properties also match
+True
 ```
 
 Note that in the above example we provide `allow_load=True` indicating
 that the backend can dynamically figure out which of your python
 classes to load the data into. If you don't like dynamically loading,
 there are various ways to specify the class to load into.
+
+## Why Frontends?
+
+You may wonder why we need a special front-end class like
+`SimpleFrame`. If you really wanted to, you could just use the
+backends by themselves as a more flexible version of `pickle` or a
+more limited version of a database object relational manager (ORM). In
+general, though, it is nice to have both a back-end protocol and a
+front-end class so that you can more intelligently do things like
+control serialization/deserialization, deal with headers, and so on.
+
+As a very simple example of this, you could modify the previous
+example via
+
+```python
+
+>>> attr = f.get_attr_dict()
+>>> attr['timezone'] = 'US/Eastern'
+>>> f.save()
+```
+
+The dictionary returned by `f.get_attr_dict()` functions as a header
+to store simple attributes. One advantage these special attributes
+have over the usual python properties is that you can do something like.
+
+```python
+
+>>> h = backend.load('test', only_hdr=True)
+>>> print('name:tz = %s:%s' % (h['_name'], h['_attributes']['timezone']))
+name:tz = test:US/Eastern
+```
+
+In the above, we use the `only_hdr=True` option to `backend.load` to
+first load only the header. This is generally a much cheaper and
+faster operation than de-serializing and loading the full
+object. Among other things, this header dictionary contains a `'_name'`
+key with the name of the object we are loading/saving and an
+`'_attributes_` key containing the dictionary provided by
+`get_attr_dict()`. As a result, we can look at the header to see the
+timezone and do things like:
+
+  1. Skip the full load for objects with the wrong timezone.
+  2. Deserialize differently depending on things in the attributes
+     such as the timezone.
+	 
+ Indeed, the `SimpleFrame` class does just that. If you load the full
+ object and print the frame, you will see that although we saved a
+ pandas DataFrame with no timezone information, the `SimpleFrame`
+ class looks for the `'timezone'` in the attributes and localize
+ appropriately on loading:
+ 
+ ```python
+>>>  print(backend.load('test', allow_load=True).frame)
+            estimate
+2017-07-01      0.17
+2017-10-01       NaN
+```
 
 ## Key Features
 
