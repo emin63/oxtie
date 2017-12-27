@@ -47,8 +47,8 @@ class Backend(object):
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
         PURPOSE:  This method saves the given front instance to the backend
-                  so that calling self.load(front.name) will return something
-                  matching front. Sub-classes shall implement this.
+                  so that calling self.load(front.get_key()) will return
+                  something matching front. Sub-classes shall implement this.
 
                   Generally sub-classes do not need to override this but
                   can instead override write_serialized instead.
@@ -60,10 +60,8 @@ class Backend(object):
     def load(self, uid, only_hdr=False, front_cls=None, allow_load=None):
         """Load a saved instance from the backend.
 
-        :param uid:    Either a string name or a Frontend instance or some
-                       other unique id that the backend supports for loading
-                       an item. A string or Frontend shall always be supported
-                       while other forms of uid depend on the backend.
+        :param uid:    Either a Frontend instance or result of calling get_key
+                       on a Frontend instance.
 
         :param only_hdr=False:  If True, only deserialize the header which
                                 is faster and cheaper.
@@ -75,12 +73,12 @@ class Backend(object):
         :param allow_load=None: If this is None then use self.allow_load.
                                 If allow_load evaluates to True, then we will
                                 try to dynamically load the module and class
-                                that the named object was serialized from.
+                                that the object was serialized from.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
         :return:  Instance of `oxtie.fronts.base.Frontend` which was
-                  previously saved with the given name.
+                  previously saved with the given key.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -138,9 +136,8 @@ class Backend(object):
     def delete(self, uid):
         """Delete the object with the given uid if present.
 
-        :param uid:    Either a string name or a Frontend instance or some
-                       other unique id that the backend supports for loading
-                       an item.
+        :param uid:    Either Frontend instance or result of calling get_key
+                       on a Frontend instance.
 
         It is considered undefined to delete an object if it does not exist.
         Sub-classes can either raise KeyError or do nothing in such cases.
