@@ -1,8 +1,22 @@
 """Specialized examples of frontends with more features.
+
+The following illustrates how you could use some features.
+
+>>> import pandas  # So we can make a dataframe.
+>>> from oxtie.fronts import specials  # Illustrate special example
+>>> from oxtie.backs import simple
+>>> frame = pandas.DataFrame({'estimate': [.17, None]}, # Make some
+...     index=['2017-07-01', '2017-10-01'])             # sample data
+>>> backend=simple.TempFileBackend()
+>>> f = specials.nums.SimpleFrame({'name': 'test'}, backend=backend,
+...     frame=frame)
+>>> f.save()
+>>> g = backend.load({'name': 'test'}, allow_load=True)
+>>> g.frame.to_csv() == f.frame.to_csv()
+True
+
 """
 
-import os
-import tempfile
 import re
 import doctest
 
@@ -118,27 +132,6 @@ class S3BackendMixin(object):  # pylint: disable=too-few-public-methods
             category=cls.default_category, bucket_name=cls.default_bucket)
 
 
-class TempFileBackend(simple.FileBackend):
-    """Backend to store to temporary file.
-
->>> import pandas  # So we can make a dataframe.
->>> from oxtie.fronts import specials  # Illustrate special example
->>> frame = pandas.DataFrame({'estimate': [.17, None]}, # Make some
-...     index=['2017-07-01', '2017-10-01'])             # sample data
->>> backend=specials.TempFileBackend()
->>> f = specials.nums.SimpleFrame(name='test', backend=backend, frame=frame)
->>> f.save()
->>> g = backend.load('test', allow_load=True)
->>> g.frame.to_csv() == f.frame.to_csv()
-True
-    """
-
-    def __init__(self, root=None, *args, **kwargs):
-        if root is None:
-            root = os.path.dirname(tempfile.mktemp())
-        super().__init__(root, *args, **kwargs)
-
-
 class EarningsFrame(ColValidatorMixin, S3BackendMixin, nums.SimpleFrame):
     """Example to show how you could save/load earnings data to/from S3.
 
@@ -154,7 +147,7 @@ class EarningsFrame(ColValidatorMixin, S3BackendMixin, nums.SimpleFrame):
 >>> frame = pandas.DataFrame({'estimate': [.17, None], 'reported': [.15, None],
 ...     'period_date': ['2017/6', '2017/9']},
 ...     index=['2017-07-01', '2017-10-01'])
->>> f = specials.EarningsFrame('test', frame=frame)
+>>> f = specials.EarningsFrame({'name': 'test'}, frame=frame)
 
     Now you would just call `f.save()` to save to s3.
     To load from s3, you would just call `specials.EarningsFrame.load('test')`.

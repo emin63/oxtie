@@ -37,7 +37,7 @@ class SimpleFrame(base.Frontend):
 
     The SimpleFrame class provides an oxtie front end to hold
     a pandas DataFrame. As with all front ends, you instantiate it
-    with a name along with optional attributes and an optional backend.
+    with a name along with optional facets and an optional backend.
     In addition, you can provide a frame which is a pandas DataFrame.
 
     The SimpleFrame knows how to intelligently store pandas DataFrame
@@ -61,7 +61,7 @@ class SimpleFrame(base.Frontend):
 
     Now we can create SimpleFrame instance.
 
->>> f = nums.SimpleFrame('test', backend=backend, frame=frame)
+>>> f = nums.SimpleFrame({'name': 'test'}, backend=backend, frame=frame)
 >>> f.more = '*' * 10  # Add some more data in a property to save.
 
     When we are ready, we can save the SimpleFrame frame.
@@ -70,7 +70,7 @@ class SimpleFrame(base.Frontend):
 
     Later, we can reload the SimpleFrame simply by using its name.
 
->>> g = nums.SimpleFrame.load('test', backend=backend)
+>>> g = nums.SimpleFrame.load({'name': 'test'}, backend=backend)
 
     Finally we verify that the loaded data matched the original and
     then cleanup.
@@ -83,19 +83,15 @@ True
 >>> shutil.rmtree(backend.root) # remove the temp directory we were using.
     """
 
-    def __init__(self, name, attributes=None, backend=None, frame=None):
+    def __init__(self, *args, frame=None, **kwargs):
         """Initializer.
 
-        :param name:  String name as for base.Frontend.
-
-        :param attributes=None:   Attribtute dict as for base.Frontend.
-
-        :param backend=None:    Optional backend as for base.Frontend.
+        :param *args, **kwargs:  As for base.Frontend.__init__.
 
         :param frame=None:    Optional pandas DataFrame.
 
         """
-        super().__init__(name, attributes, backend)
+        super().__init__(*args, **kwargs)
         self.frame = frame
 
     def help_serialize_body(self):
@@ -123,7 +119,7 @@ True
         idx = result['__index']
         result['__data'] = {n: [] for n in list(self.frame)}
         data_cols = [result['__data'][n] for n in list(self.frame)]
-        my_tz = self._attributes.get('timezone', None)
+        my_tz = self._facets.get('_timezone', None)
         for item in self.frame.itertuples():
             idx_item = item[0]
             if my_tz is not None and hasattr(idx_item, 'tz_localize'):
@@ -213,7 +209,7 @@ True
 
         """
         idx = cls.deserialize_timestamps(
-            skips['__index'], basic.get_attr_dict().get('timezone'))
+            skips['__index'], basic.get_facets_dict().get('_timezone'))
         fdict = {}
         for cname in skips['__columns']:
             cval = skips['__data'][cname]
@@ -255,10 +251,10 @@ True
 >>> reported = [e + .05 * random.gauss(0, 1) for e in estimate]
 >>> p = pandas.DataFrame({'estimate': estimate, 'reported': reported},
 ...     index=idx)
->>> f = nums.SimpleFrame('test', {}, backend, p)
+>>> f = nums.SimpleFrame({'name': 'test'}, backend, frame=p)
 >>> f.more = '*' * 10  # Add some more data in a property to save.
 >>> f.save()
->>> g = backend.load('test', allow_load=True)
+>>> g = backend.load({'name': 'test'}, allow_load=True)
 >>> all(g.frame == f.frame) and f.more == g.more
 True
 >>> shutil.rmtree(backend.root)
@@ -284,10 +280,10 @@ True
 ...    '10/1/2017,,2017/9,,FALSE',
 ...    '7/1/2017,0.17,2017/6,0.15,TRUE']))
 >>> p = pandas.read_csv(data, index_col=0, parse_dates=[0])
->>> f = nums.SimpleFrame('test', {}, backend, p)
+>>> f = nums.SimpleFrame({'name': 'test'}, backend, frame=p)
 >>> f.more = '*' * 10  # Add some more data in a property to save.
 >>> f.save()
->>> g = backend.load('test', allow_load=True)
+>>> g = backend.load({'name': 'test'}, allow_load=True)
 >>> all(g.frame == f.frame) and f.more == g.more
 True
 
@@ -296,7 +292,7 @@ True
     having to call pandas.read_csv first:
 
 >>> cbody = {'__csv': f.frame.to_csv()}
->>> h = nums.SimpleFrame.deserialize_body_csv({'_name': 'test'}, cbody, None)
+>>> h = nums.SimpleFrame.deserialize_body_csv({'name': 'test'}, cbody, None)
 >>> all(h.frame == f.frame)
 True
 

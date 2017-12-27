@@ -26,9 +26,10 @@ class Frontend(object):
 >>> backend = simple.FileBackend(root=tempfile.mkdtemp(suffix='.oxtie'))
 
     Now we crate an instance of our Frontend object with the name
-    'test', some attributes, and tell it to use our backend.
+    'test' and some other facets, and tell it to use our backend.
 
->>> f = base.Frontend('test', {'last_update': '2017', 'bar': 'baz'}, backend)
+>>> f = base.Frontend({'name': 'test', '_last_update': '2017', '_bar': 'baz'},
+...                   backend)
 
     We could have sub-classed base.Frontend to have additional properties
     or we can just add them whenever we like:
@@ -43,12 +44,12 @@ class Frontend(object):
 >>> f.save()
 
     We can load just the header for our saved object if desired. This is
-    usually very cheap and fast. The header also provides the attributes
+    usually very cheap and fast. The header also provides the facets
     (which should be kept small) so you can load the header to decide if
     you want to do further processing:
 
->>> hdr = backend.load('test', only_hdr=True) # Fast load of just header
->>> hdr['_attributes']['last_update']
+>>> hdr = backend.load({'name': 'test'}, only_hdr=True) # Fast load just header
+>>> hdr['_facets']['_last_update']
 '2017'
 
     Imagine we do want to load the item. We can just call the backend.load
@@ -57,7 +58,7 @@ class Frontend(object):
     don't need to specify the frontend because the backend can read it
     from the header and find the right class itself.
 
->>> g = backend.load('test', front_cls=base.Frontend)
+>>> g = backend.load({'name': 'test'}, front_cls=base.Frontend)
 >>> f.big_data == g.big_data  # Verify things worked
 True
 
@@ -65,7 +66,7 @@ True
 
 >>> import importlib
 >>> mod = importlib.import_module(hdr['mod_name'])
->>> h = backend.load('test', front_cls=getattr(mod, hdr['cls_name']))
+>>> h = backend.load({'name': 'test'}, front_cls=getattr(mod, hdr['cls_name']))
 >>> h.big_data == f.big_data
 True
 
@@ -74,7 +75,7 @@ True
     not done by default since loading arbitrary modules is potentially
     a security risk and it might get confusing if your paths are not set right.
 
->>> i = backend.load('test', allow_load=True)
+>>> i = backend.load({'name': 'test'}, allow_load=True)
 >>> i.big_data == f.big_data
 True
 
@@ -84,21 +85,18 @@ True
 
     """
 
-    def __init__(self, name, attributes, backend=None):
+    def __init__(self, facets, backend=None):
         """Initializer.
 
-        :param name:   String name for this instance. This will be used as
-                       a key by the backend so it should be unique.
-
-        :param attributes:   Dictionary of attributes for the item. This can
-                             be {} if you have no attriubutes. Ideally it
+        :param facets:       Dictionary of "facets" for the item. Ideally it
                              should be a dictionary of string keys and
                              simple types (e.g., int, float, string, dates)
                              as values. Which can be serialized with msgpack.
-                             An import feature of the attributes is that
+                             An important feature of the facets is that
                              they are packed/unpacked in the header so you
                              can easily/quickly assess whether to do a full
-                             unpack or not or scan packed items.
+                             unpack or not or scan packed items. The KEY
+                             for the object must come from the facets.
 
         :param backend=None: Instance of a backend to use in saving. This can
                              be None if you don't intend to save it or if you
@@ -109,21 +107,49 @@ True
         PURPOSE:  Main initializer for a Frontend. Sub-classes will almost
                   certainly have additional properties to store.
         """
-        self._name = name
-        self._attributes = attributes if attributes is not None else {}
+        self._facets = facets
         self._backend = backend
 
-    def get_name(self):
-        """Return the name of this object.
+    @classmethod
+    def facets2key(cls, facets):
+        """Take in the facets dict and return the key dict.
 
-        Use get_name instead of accessing self._name directly for safety.
-        """
-        return self._name
+        The `facets` input is a dictionary with string keys and values such
+        that str(VALUE) is stable (i.e., not something like a float which may
+        have a different string representation on different systems).
 
-    def get_attr_dict(self):
-        """Return a reference to the self._attributes dict set in __init__.
+        This function shall return a dict which represents the unique key
+        identifying this object. By default, we just return everything in
+        `facets` where the key name does not begin with an underscore, but
+        sub-classes may want to do something more intelligent like return only
+        `facets['name']` or `'%s/%s' % (facets['category'], facets['name'])`.
+
+        The returned value must satisfy the following criteria:
+
+            1. It must uniquely identify the object.
+            2. It must be a dictionary with string keys and string values.
+            3. The algorithm to get the key from the facets must be a stable
+               function of only the input facets (e.g., it should not call
+               random, or use values in the object outside the header).
+
+        This key is used to identify the object when saving and loading
+        to and from the backend.
         """
-        return self._attributes
+        dummy = cls  # Sub-classes may want to use cls, but we ignore it here
+        return {n: v for n, v in facets.items() if n and n[0] != '_'}
+
+    def get_key(self):
+        """Return a dict representing key for this object.
+
+        The default version simply does self.facets2key(self.get_facets_dict())
+        Sub-classes may which to override this or just override facets2key.
+        """
+        return self.facets2key(self.get_facets_dict())
+
+    def get_facets_dict(self):
+        """Return a reference to the self._facets dict set in __init__.
+        """
+        return self._facets
 
     def serialize(self, body_mode=None):
         """Serialize self into a string.
@@ -181,7 +207,7 @@ True
 
         """
         header = {'body_mode': 'msgpack', '__oxtie_version__': oxtie.version,
-                  '_name': self._name, '_attributes': self._attributes,
+                  '_facets': self._facets,
                   'mod_name': self.__module__,
                   'cls_name': self.__class__.__name__}
         return msgpack.packb(header, use_bin_type=True)
@@ -196,7 +222,7 @@ True
                              sub-classes.
 
         :param skips=(): Tuple of strings indicating properties to skip. We
-                         always skip _backend, _name, and _attributes since
+                         always skip _backend and _facets since
                          those eitehr go in the header or are not supposed
                          to be serialized. If you implement a sub-class that
                          serializes some properties in a special way, you can
@@ -219,7 +245,7 @@ True
         NOTE: If you do something special here, you may also need to
               override deserialize_body_msgpack as well.
         """
-        skips = set(skips).union(('_backend', '_name', '_attributes'))
+        skips = set(skips).union(('_backend', '_facets'))
         body = {n: v for n, v in self.__dict__.items() if n not in skips}
         if do_pack:
             body = msgpack.packb(body, use_bin_type=True)
@@ -351,7 +377,7 @@ True
 
         """
         skips = skips if skips else {}
-        result = cls(hdr['_name'], hdr.get('_attributes', {}), backend)
+        result = cls(hdr.get('_facets', {}), backend)
         if isinstance(body, dict):
             my_dict = body
         else:
@@ -403,12 +429,11 @@ True
         backend.save(self)
 
     @classmethod
-    def load(cls, uid, backend=None, only_hdr=False):
-        """Load an instance of self with the given name from specified backend.
+    def load(cls, key, backend=None, only_hdr=False):
+        """Load an instance of self with the given key from specified backend.
 
-        :param uid:    Either a string name or a Frontend instance or some
-                       other unique id that the backend supports for loading
-                       an item.
+        :param key:    A dictionary with string keys and string values as
+                       produced by the get_key method or a Frontend instance.
 
         :param backend=None:   The backend we want to load from. If this is
                                None, we call get_backend() to try to get one.
@@ -428,7 +453,7 @@ True
 
         """
         backend = cls.get_backend(backend)
-        new_item = backend.load(uid, only_hdr=only_hdr, front_cls=cls)
+        new_item = backend.load(key, only_hdr=only_hdr, front_cls=cls)
         return new_item
 
     def delete(self, backend=None):

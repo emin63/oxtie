@@ -7,4 +7,4 @@ The following are some useful places to look for more information:
 
 """
 
-version = '0.1.1'
+version = '0.2.1'
