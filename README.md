@@ -149,9 +149,8 @@ name:tz = test:US/Eastern
 In the above, we use the `only_hdr=True` option to `backend.load` to
 first load only the header. This is generally a much cheaper and
 faster operation than de-serializing and loading the full
-object. Among other things, this header dictionary contains a `'_name'`
-key with the name of the object we are loading/saving and an
-`'_facets_` key containing the dictionary provided by
+object. Among other things, this header dictionary contains a
+`'_facets` key containing the dictionary provided by
 `get_facets_dict()`. As a result, we can look at the header to see the
 timezone and do things like:
 
@@ -159,11 +158,11 @@ timezone and do things like:
   2. Deserialize differently depending on things in the facets
      such as the timezone.
 	 
- Indeed, the `SimpleFrame` class does just that. If you load the full
- object and print the frame, you will see that although we saved a
- pandas DataFrame with no timezone information, the `SimpleFrame`
- class looks for the `'_timezone'` in the facets and localize
- appropriately on loading:
+Indeed, the `SimpleFrame` class does just that. If you load the full
+object and print the frame, you will see that although we saved a
+pandas DataFrame with no timezone information, the `SimpleFrame`
+class looks for the `'_timezone'` in the facets and localize
+appropriately on loading:
  
 ```
 >>> print(backend.load({'name': 'test'},allow_load=True).frame.index[0])
